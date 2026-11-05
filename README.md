@@ -17,6 +17,8 @@
 ## Vercel 배포 + 저장소 연결
 1. Vercel에서 이 레포를 Import (Framework Preset: Other, 빌드 설정 비움)
 2. 프로젝트 → **Storage** → **Upstash for Redis**(Marketplace) 생성 후 이 프로젝트에 Connect
+   - Region: 한국이 없으므로 가장 가까운 **Tokyo (ap-northeast-1)** 선택
+   - 저장 API도 `vercel.json` 에서 도쿄(`hnd1`)에서 실행되도록 맞춰 두었습니다
    → `KV_REST_API_URL`, `KV_REST_API_TOKEN` 환경변수가 자동으로 들어갑니다
 3. **Redeploy** 한 번 하면 끝
 
