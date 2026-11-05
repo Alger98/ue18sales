@@ -8,7 +8,7 @@
   <title>UE18 판매 현황</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       color-scheme: light;
@@ -19,18 +19,30 @@
       --fg: #000;
       --fs-title: clamp(36px, min(5vw, 7.5vh), 64px);
       --fs-body: 15px;
+      --font: "Noto Sans KR", "Noto Sans SC", system-ui, sans-serif;
     }
+    html[lang="zh"] { --font: "Noto Sans SC", "Noto Sans KR", system-ui, sans-serif; }
     *, *::before, *::after { box-sizing: border-box; }
     html, body, * { touch-action: manipulation; } /* 더블탭 확대 막기 */
     html, body {
       margin: 0;
       background: var(--bg);
       color: var(--fg);
-      font-family: "Noto Sans KR", system-ui, sans-serif;
+      font-family: var(--font);
       -webkit-font-smoothing: antialiased;
       -webkit-text-size-adjust: 100%;
     }
-    button { font: inherit; color: inherit; }
+    button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+    /* ---------- 언어 버튼 (작품 소개 사이트와 같은 모양) ---------- */
+    .lang { position: fixed; top: 10px; right: var(--gutter); z-index: 20; display: flex; gap: 4px; }
+    .lang button { width: 30px; height: 30px; padding: 0; border: 1px solid var(--fg); border-radius: 50%; background: transparent; cursor: pointer; }
+    .lang svg { display: block; width: calc(100% + 2px); height: calc(100% + 2px); margin: -1px; overflow: visible; }
+    .lang text { font-family: var(--font); font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+    .lang__label { fill: currentColor; }
+    .lang__fill { fill: currentColor; display: none; }
+    .lang button[aria-pressed="true"] .lang__fill { display: inline; }
+    .lang button[aria-pressed="true"] .lang__label { display: none; }
 
     .page {
       min-height: 100vh;
@@ -39,17 +51,21 @@
       max-width: 960px;
       margin: 0 auto;
     }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 16px;
-      margin-bottom: 28px;
-    }
+    header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
     h1 { margin: 0; font-size: var(--fs-title); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
     .sub { margin: 6px 0 0; font-size: 14px; font-weight: 500; }
 
-    /* 언어 버튼과 같은 둥근 버튼 */
+    /* ---------- 날짜 탭 ---------- */
+    .tabs { display: flex; gap: 6px; margin-bottom: 22px; }
+    .tab {
+      flex: 1; height: 34px; padding: 0 8px;
+      border: 1px solid var(--fg); border-radius: 17px;
+      background: transparent; font-size: 14px; font-weight: 500;
+      cursor: pointer; white-space: nowrap;
+    }
+    .tab[aria-selected="true"] { background: var(--fg); color: var(--bg); font-weight: 700; }
+
+    /* 둥근 버튼 (+ / −) */
     .round {
       flex: none;
       display: inline-flex; align-items: center; justify-content: center;
@@ -58,7 +74,6 @@
       background: transparent;
       font-size: 16px; font-weight: 500; line-height: 1;
       cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
     }
     .round:active { background: var(--fg); color: var(--bg); }
     .round:disabled { opacity: .3; cursor: default; background: transparent; color: var(--fg); }
@@ -69,22 +84,19 @@
       cursor: pointer; white-space: nowrap;
     }
     .pill:active { background: var(--fg); color: var(--bg); }
+    .pill[hidden] { display: none; }
 
-    /* 표: 작품 | 가격 | +/− | 수량 | 금액 */
+    /* ---------- 표: 작품 | 가격 | + / − | 수량 | 금액 ---------- */
     .sheet { width: 100%; font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
     .row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 76px 68px 36px 92px;
+      grid-template-columns: minmax(0, 1fr) 76px 68px 44px 92px;
       align-items: center;
       column-gap: 12px;
       padding: 12px 0;
       border-bottom: 1px solid var(--fg);
     }
-    .head {
-      font-size: 12px; font-weight: 500;
-      padding: 0 0 8px;
-      border-bottom: 2px solid var(--fg);
-    }
+    .head { font-size: 12px; font-weight: 500; padding: 0 0 8px; border-bottom: 2px solid var(--fg); white-space: nowrap; }
     .work { min-width: 0; }
     .work .title { display: block; font-weight: 500; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
     .work .author { display: block; font-size: 12px; line-height: 1.4; margin-top: 2px; }
@@ -93,75 +105,80 @@
     .qty { text-align: center; font-weight: 700; }
     .row.has .sum { font-weight: 700; }
     .row:not(.has) .qty, .row:not(.has) .sum { opacity: .45; }
+    /* 총합 탭: 수정 버튼 없이 날짜별 수량을 작게 표시 */
+    .days { font-size: 11px; line-height: 1.5; text-align: center; white-space: nowrap; }
 
     .total {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 36px minmax(92px, max-content);
+      grid-template-columns: minmax(0, 1fr) minmax(44px, max-content) minmax(92px, max-content);
       column-gap: 12px;
       align-items: baseline;
-      white-space: nowrap;
       padding: 16px 0 0;
       border-top: 2px solid var(--fg);
       margin-top: -1px;
       font-size: 22px; font-weight: 700;
+      white-space: nowrap;
     }
-    .total .label { font-size: 22px; }
-    .total .qty, .total .num { font-size: 22px; }
-    /* 하단 합계의 수량·금액 열을 위 표의 수량·금액 열과 맞춤 */
-    .total { padding-right: 0; }
     .foot { margin-top: 28px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 
-    /* 휴대폰: 열 폭을 줄이고 가격은 작가 줄로 */
+    /* 휴대폰: 가격은 작가 줄로 */
     @media (max-width: 560px) {
-      :root { --gutter: 20px; --gutter-top: 40px; --gutter-bottom: 40px; }
-      .row { grid-template-columns: minmax(0, 1fr) 64px 28px 76px; column-gap: 8px; }
+      :root { --gutter: 20px; --gutter-top: 52px; --gutter-bottom: 40px; }
+      .row { grid-template-columns: minmax(0, 1fr) 64px 36px 76px; column-gap: 8px; }
       .row .price { display: none; }
-      .work .author .p { display: inline; }
-      .total { grid-template-columns: minmax(0, 1fr) 28px minmax(76px, max-content); column-gap: 8px; font-size: 18px; }
-      .total .label, .total .qty, .total .num { font-size: 18px; }
+      .total { grid-template-columns: minmax(0, 1fr) minmax(36px, max-content) minmax(76px, max-content); column-gap: 8px; font-size: 18px; }
+      .tab { font-size: 13px; }
     }
     @media (min-width: 561px) { .work .author .p { display: none; } }
 
     .toast {
-      position: fixed; left: 50%; top: 12px; z-index: 10;
+      position: fixed; left: 50%; top: 12px; z-index: 30;
+      max-width: calc(100% - 2 * var(--gutter) - 90px);
       height: 30px; padding: 0 14px; border-radius: 15px;
       background: var(--fg); color: var(--bg);
-      font-size: 12px; line-height: 30px; white-space: nowrap;
-      opacity: 0; transform: translate(-50%, 6px); transition: opacity .2s, transform .2s;
+      font-size: 12px; line-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      opacity: 0; transform: translate(-50%, -6px); transition: opacity .2s, transform .2s;
       pointer-events: none;
     }
     .toast.on { opacity: 1; transform: translate(-50%, 0); }
   </style>
 </head>
 <body>
+  <nav class="lang" aria-label="Language">
+    <button type="button" data-lang="ko" aria-label="한국어">한</button>
+    <button type="button" data-lang="zh" aria-label="中文">中</button>
+  </nav>
+
   <main class="page">
     <header>
       <div>
-        <h1>판매 현황</h1>
+        <h1 data-t="title"></h1>
         <p class="sub">SUNYAO.DESIGN · G22</p>
       </div>
-      <button type="button" class="pill" id="reset">초기화</button>
+      <button type="button" class="pill" id="reset"></button>
     </header>
+
+    <div class="tabs" role="tablist" id="tabs"></div>
 
     <div class="sheet" id="sheet">
       <div class="row head">
-        <span>작품 · 작가</span>
-        <span class="num price">가격</span>
-        <span class="btns">+ / −</span>
-        <span class="qty">수량</span>
-        <span class="num">금액</span>
+        <span data-t="work"></span>
+        <span class="num price" data-t="price"></span>
+        <span class="btns" id="head-btns">+ / −</span>
+        <span class="qty" data-t="qty"></span>
+        <span class="num" data-t="amount"></span>
       </div>
       <div id="rows"></div>
       <div class="total">
-        <span class="label">합계</span>
-        <span class="qty" id="total-qty">0</span>
-        <span class="num" id="total-sum">0₩</span>
+        <span data-t="sum"></span>
+        <span class="qty" id="total-qty"></span>
+        <span class="num" id="total-sum"></span>
       </div>
     </div>
 
     <div class="foot">
-      <span id="saved">이 기기에 자동 저장됩니다.</span>
-      <button type="button" class="pill" id="export">CSV 저장</button>
+      <span data-t="saved"></span>
+      <button type="button" class="pill" id="export" data-t="csv"></button>
     </div>
   </main>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -170,56 +187,121 @@
   (function () {
     "use strict";
 
-    /* 작품 목록: 작품 소개 사이트(SYDesign)의 순서·가격과 같음. 가격은 숫자만. */
+    /* 작품 목록: 작품 소개 사이트(SYDesign)와 같은 순서·가격. 가격은 숫자만. */
     const WORKS = [
-      { id: "work-1",  title: "염증 안내서", author: "SUN YAO", price: 48000 },
-      { id: "work-2",  title: "생생불식", author: "SUN YAO", price: 14000 },
-      { id: "work-3",  title: "새옹지마", author: "SUN YAO", price: 14000 },
-      { id: "work-4",  title: "금단의 열매", author: "SUN YAO", price: 15000 },
-      { id: "work-5",  title: "낚시하기", author: "임수현", price: 28000 },
-      { id: "work-6",  title: "낚시하기 – 스코딕스 엽서", author: "임수현", price: 3000 },
-      { id: "work-7",  title: "3D 프린팅 타이포그래피", author: "Li Haoyang", price: 36000 },
-      { id: "work-8",  title: "새옹지마 – 3D", author: "Li Haoyang", price: 22000 },
-      { id: "work-9",  title: "2D란 무엇이고 3D란 무엇인가", author: "Li Haoyang", price: 14000 },
-      { id: "work-10", title: "백독불침", author: "Li Haoyang", price: 8000 },
-      { id: "work-11", title: "운수대통", author: "Li Haoyang", price: 8000 },
-      { id: "work-12", title: "The Topography of Typography", author: "Li Haoyang", price: 16000 },
-      { id: "work-13", title: "반전도시", author: "Li Haoyang", price: 30000 },
+      { id: "work-1",  price: 48000, ko: ["염증 안내서", "SUN YAO"], zh: ["上火指南", "SUN YAO"] },
+      { id: "work-2",  price: 14000, ko: ["생생불식", "SUN YAO"], zh: ["生生不息", "SUN YAO"] },
+      { id: "work-3",  price: 14000, ko: ["새옹지마", "SUN YAO"], zh: ["塞翁失馬", "SUN YAO"] },
+      { id: "work-4",  price: 15000, ko: ["금단의 열매", "SUN YAO"], zh: ["禁果", "SUN YAO"] },
+      { id: "work-5",  price: 28000, ko: ["낚시하기", "임수현"], zh: ["钓鱼", "林秀炫"] },
+      { id: "work-6",  price: 3000,  ko: ["낚시하기 – 스코딕스 엽서", "임수현"], zh: ["钓鱼 – Scodix明信片", "林秀炫"] },
+      { id: "work-7",  price: 36000, ko: ["3D 프린팅 타이포그래피", "Li Haoyang"], zh: ["3D打印字体", "Li Haoyang"] },
+      { id: "work-8",  price: 22000, ko: ["새옹지마 – 3D", "Li Haoyang"], zh: ["塞翁失馬 – 3D", "Li Haoyang"] },
+      { id: "work-9",  price: 14000, ko: ["2D란 무엇이고 3D란 무엇인가", "Li Haoyang"], zh: ["何为二维，何为三维", "Li Haoyang"] },
+      { id: "work-10", price: 8000,  ko: ["백독불침", "Li Haoyang"], zh: ["百毒不侵", "Li Haoyang"] },
+      { id: "work-11", price: 8000,  ko: ["운수대통", "Li Haoyang"], zh: ["時來運轉", "Li Haoyang"] },
+      { id: "work-12", price: 16000, ko: ["The Topography of Typography", "Li Haoyang"], zh: ["The Topography of Typography", "Li Haoyang"] },
+      { id: "work-13", price: 30000, ko: ["반전도시", "Li Haoyang"], zh: ["反轉都市", "Li Haoyang"] },
     ];
 
-    const KEY = "ue18-sales";
+    /* 날짜 탭 (2026년 북페어) + 총합 */
+    const DAYS = [
+      { id: "2026-11-06", label: "11/6" },
+      { id: "2026-11-07", label: "11/7" },
+      { id: "2026-11-08", label: "11/8" },
+    ];
+    const TOTAL = "total";
+
+    const T = {
+      ko: {
+        title: "판매 현황", work: "작품 · 작가", price: "가격", qty: "수량", amount: "금액", sum: "합계",
+        totalTab: "총합", unit: "개", reset: "초기화", csv: "CSV 저장",
+        saved: "이 기기에 자동 저장됩니다.", confirmReset: (d) => `${d} 수량을 모두 0으로 되돌릴까요?`,
+        done: "초기화했습니다",
+      },
+      zh: {
+        title: "销售情况", work: "作品 · 作者", price: "价格", qty: "数量", amount: "金额", sum: "合计",
+        totalTab: "总计", unit: "件", reset: "重置", csv: "保存CSV",
+        saved: "自动保存在此设备上。", confirmReset: (d) => `要将 ${d} 的数量全部清零吗？`,
+        done: "已重置",
+      },
+    };
+
+    const KEY = "ue18-sales-v2";
     const won = (n) => n.toLocaleString("ko-KR") + "₩";
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const rowsEl = document.getElementById("rows");
+    const store = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+    const get = (k, d) => { try { const v = store && store.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
+    const set = (k, v) => { try { store && store.setItem(k, v); } catch (e) {} };
 
-    let sales = load();
+    // sales = { "2026-11-06": { "work-1": 2, ... }, ... }
+    let sales = (() => { try { return JSON.parse(get(KEY, "{}")) || {}; } catch (e) { return {}; } })();
+    DAYS.forEach((d) => { if (!sales[d.id] || typeof sales[d.id] !== "object") sales[d.id] = {}; });
+    const save = () => set(KEY, JSON.stringify(sales));
 
-    function load() {
-      try { return JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { return {}; }
-    }
-    function save() {
-      try { localStorage.setItem(KEY, JSON.stringify(sales)); } catch (e) {}
+    let lang = get("ue18-lang", "ko") === "zh" ? "zh" : "ko";
+    // 첫 화면: 오늘이 판매일이면 그 날짜, 아니면 마지막으로 보던 탭, 없으면 11/6
+    const today = new Date(); const pad = (n) => String(n).padStart(2, "0");
+    const todayId = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    let tab = DAYS.some((d) => d.id === todayId) ? todayId : get("ue18-tab", DAYS[0].id);
+    if (tab !== TOTAL && !DAYS.some((d) => d.id === tab)) tab = DAYS[0].id;
+
+    const qtyOf = (day, id) => (sales[day] && sales[day][id]) || 0;
+    const totalQtyOf = (id) => DAYS.reduce((s, d) => s + qtyOf(d.id, id), 0);
+    const viewQty = (id) => (tab === TOTAL ? totalQtyOf(id) : qtyOf(tab, id));
+    const tabLabel = (id) => (id === TOTAL ? T[lang].totalTab : DAYS.find((d) => d.id === id).label);
+
+    function renderTabs() {
+      const all = [...DAYS.map((d) => d.id), TOTAL];
+      document.getElementById("tabs").innerHTML = all.map((id) =>
+        `<button type="button" class="tab" role="tab" data-tab="${id}" aria-selected="${id === tab}">${esc(tabLabel(id))}</button>`).join("");
     }
 
     function render() {
+      const L = T[lang];
+      const isTotal = tab === TOTAL;
+      // 총합 탭 머리글: "11/6·7·8" 처럼 짧게
+      document.getElementById("head-btns").textContent = isTotal ? "11/" + DAYS.map((d) => d.label.split("/")[1]).join("·") : "+ / −";
+      document.getElementById("reset").hidden = isTotal;
       rowsEl.innerHTML = WORKS.map((w) => {
-        const n = sales[w.id] || 0;
+        const n = viewQty(w.id);
+        const [title, author] = w[lang];
+        const mid = isTotal
+          ? `<span class="btns days">${DAYS.map((d) => qtyOf(d.id, w.id)).join(" · ")}</span>`
+          : `<span class="btns">
+              <button type="button" class="round" data-d="1" aria-label="+1">+</button>
+              <button type="button" class="round" data-d="-1" aria-label="-1"${n ? "" : " disabled"}>−</button>
+            </span>`;
         return `<div class="row${n ? " has" : ""}" data-id="${w.id}">
-          <span class="work"><span class="title">${esc(w.title)}</span><span class="author">${esc(w.author)}<span class="p"> · ${won(w.price)}</span></span></span>
+          <span class="work"><span class="title">${esc(title)}</span><span class="author">${esc(author)}<span class="p"> · ${won(w.price)}</span></span></span>
           <span class="num price">${won(w.price)}</span>
-          <span class="btns">
-            <button type="button" class="round" data-d="1" aria-label="${esc(w.title)} 1개 추가">+</button>
-            <button type="button" class="round" data-d="-1" aria-label="${esc(w.title)} 1개 빼기"${n ? "" : " disabled"}>−</button>
-          </span>
+          ${mid}
           <span class="qty">${n}</span>
           <span class="num sum">${won(n * w.price)}</span>
         </div>`;
       }).join("");
-      const qty = WORKS.reduce((s, w) => s + (sales[w.id] || 0), 0);
-      const sum = WORKS.reduce((s, w) => s + (sales[w.id] || 0) * w.price, 0);
-      document.getElementById("total-qty").textContent = qty;
+      const qty = WORKS.reduce((s, w) => s + viewQty(w.id), 0);
+      const sum = WORKS.reduce((s, w) => s + viewQty(w.id) * w.price, 0);
+      document.getElementById("total-qty").textContent = qty + L.unit;
       document.getElementById("total-sum").textContent = won(sum);
     }
+
+    function setLang(next) {
+      lang = next; set("ue18-lang", next);
+      document.documentElement.lang = next;
+      document.title = "UE18 " + T[next].title;
+      document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === next)));
+      document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = T[next][el.dataset.t]; });
+      document.getElementById("reset").textContent = T[next].reset;
+      renderTabs(); render();
+    }
+
+    // 선택된 언어 버튼은 글자가 뚫린 원 (작품 소개 사이트와 동일)
+    document.querySelectorAll(".lang button").forEach((b) => {
+      const label = b.textContent.trim(), id = "m-" + b.dataset.lang;
+      b.innerHTML = `<svg viewBox="0 0 30 30" aria-hidden="true"><mask id="${id}"><rect width="30" height="30" fill="#fff"/><text x="15" y="15" fill="#000">${label}</text></mask><circle class="lang__fill" cx="15" cy="15" r="15" mask="url(#${id})"/><text class="lang__label" x="15" y="15">${label}</text></svg>`;
+    });
 
     let t;
     function toast(msg) {
@@ -228,39 +310,53 @@
       clearTimeout(t); t = setTimeout(() => el.classList.remove("on"), 1400);
     }
 
+    document.querySelector(".lang").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-lang]"); if (b) setLang(b.dataset.lang);
+    });
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tab]"); if (!b) return;
+      tab = b.dataset.tab; set("ue18-tab", tab); renderTabs(); render();
+    });
     rowsEl.addEventListener("click", (e) => {
       const b = e.target.closest("button[data-d]");
-      if (!b) return;
+      if (!b || tab === TOTAL) return;
       const id = b.closest(".row").dataset.id;
-      const next = Math.max(0, (sales[id] || 0) + Number(b.dataset.d));
-      if (next) sales[id] = next; else delete sales[id];
+      const day = sales[tab];
+      const next = Math.max(0, (day[id] || 0) + Number(b.dataset.d));
+      if (next) day[id] = next; else delete day[id];
       save(); render();
       const w = WORKS.find((x) => x.id === id);
-      toast(`${w.title} ${next}개`);
+      toast(`${tabLabel(tab)} · ${w[lang][0]} ${next}${T[lang].unit}`);
     });
-
     document.getElementById("reset").addEventListener("click", () => {
-      if (!confirm("모든 수량을 0으로 되돌릴까요?")) return;
-      sales = {}; save(); render(); toast("초기화했습니다");
+      if (tab === TOTAL) return;
+      if (!confirm(T[lang].confirmReset(tabLabel(tab)))) return;
+      sales[tab] = {}; save(); render(); toast(`${tabLabel(tab)} · ${T[lang].done}`);
     });
 
-    // 엑셀에서 열 수 있는 CSV로 저장 (한글 깨짐 방지용 BOM 포함)
+    // 엑셀에서 열 수 있는 CSV (날짜별 수량 + 총합). 한글 깨짐 방지용 BOM 포함
     document.getElementById("export").addEventListener("click", () => {
-      const lines = [["작품", "작가", "가격", "수량", "금액"]];
-      WORKS.forEach((w) => { const n = sales[w.id] || 0; lines.push([w.title, w.author, w.price, n, n * w.price]); });
-      const qty = WORKS.reduce((s, w) => s + (sales[w.id] || 0), 0);
-      const sum = WORKS.reduce((s, w) => s + (sales[w.id] || 0) * w.price, 0);
-      lines.push(["합계", "", "", qty, sum]);
+      const L = T[lang];
+      const [colWork, colAuthor] = L.work.split(" · ");
+      const head = [colWork, colAuthor, L.price, ...DAYS.map((d) => d.label), `${L.totalTab} ${L.qty}`, `${L.totalTab} ${L.amount}`];
+      const lines = [head];
+      WORKS.forEach((w) => {
+        const n = totalQtyOf(w.id);
+        lines.push([w[lang][0], w[lang][1], w.price, ...DAYS.map((d) => qtyOf(d.id, w.id)), n, n * w.price]);
+      });
+      const dayQty = DAYS.map((d) => WORKS.reduce((s, w) => s + qtyOf(d.id, w.id), 0));
+      const allQty = WORKS.reduce((s, w) => s + totalQtyOf(w.id), 0);
+      const allSum = WORKS.reduce((s, w) => s + totalQtyOf(w.id) * w.price, 0);
+      lines.push([L.sum, "", "", ...dayQty, allQty, allSum]);
       const csv = "﻿" + lines.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      const d = new Date();
-      a.download = `UE18-판매현황-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.csv`;
+      a.download = `UE18-sales-${todayId}.csv`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     });
 
-    render();
+    setLang(lang);
   })();
   </script>
 </body>
