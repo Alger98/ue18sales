@@ -77,14 +77,6 @@
     }
     .round:active { background: var(--fg); color: var(--bg); }
     .round:disabled { opacity: .3; cursor: default; background: transparent; color: var(--fg); }
-    .pill {
-      height: 30px; padding: 0 14px;
-      border: 1px solid var(--fg); border-radius: 15px;
-      background: transparent; font-size: 13px; font-weight: 500;
-      cursor: pointer; white-space: nowrap;
-    }
-    .pill:active { background: var(--fg); color: var(--bg); }
-    .pill[hidden] { display: none; }
 
     /* ---------- 표: 작품 | 가격 | + / − | 수량 | 금액 ---------- */
     .sheet { width: 100%; font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
@@ -119,7 +111,6 @@
       font-size: 22px; font-weight: 700;
       white-space: nowrap;
     }
-    .foot { margin-top: 28px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 
     /* 휴대폰: 가격은 작가 줄로 */
     @media (max-width: 560px) {
@@ -155,7 +146,6 @@
         <h1 data-t="title"></h1>
         <p class="sub">SUNYAO.DESIGN · G22</p>
       </div>
-      <button type="button" class="pill" id="reset"></button>
     </header>
 
     <div class="tabs" role="tablist" id="tabs"></div>
@@ -176,10 +166,6 @@
       </div>
     </div>
 
-    <div class="foot">
-      <span data-t="saved"></span>
-      <button type="button" class="pill" id="export" data-t="csv"></button>
-    </div>
   </main>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -215,15 +201,13 @@
     const T = {
       ko: {
         title: "판매 현황", work: "작품 · 작가", price: "가격", qty: "수량", amount: "금액", sum: "합계",
-        totalTab: "총합", unit: "개", reset: "초기화", csv: "CSV 저장",
-        saved: "이 기기에 자동 저장됩니다.", confirmReset: (d) => `${d} 수량을 모두 0으로 되돌릴까요?`,
-        done: "초기화했습니다",
+        totalTab: "총합", unit: "개",
+        failed: "저장하지 못했습니다. 다시 눌러 주세요", offline: "서버에 연결하지 못했습니다",
       },
       zh: {
         title: "销售情况", work: "作品 · 作者", price: "价格", qty: "数量", amount: "金额", sum: "合计",
-        totalTab: "总计", unit: "件", reset: "重置", csv: "保存CSV",
-        saved: "自动保存在此设备上。", confirmReset: (d) => `要将 ${d} 的数量全部清零吗？`,
-        done: "已重置",
+        totalTab: "总计", unit: "件",
+        failed: "保存失败，请再点一次", offline: "无法连接服务器",
       },
     };
 
@@ -236,9 +220,45 @@
     const set = (k, v) => { try { store && store.setItem(k, v); } catch (e) {} };
 
     // sales = { "2026-11-06": { "work-1": 2, ... }, ... }
-    let sales = (() => { try { return JSON.parse(get(KEY, "{}")) || {}; } catch (e) { return {}; } })();
-    DAYS.forEach((d) => { if (!sales[d.id] || typeof sales[d.id] !== "object") sales[d.id] = {}; });
-    const save = () => set(KEY, JSON.stringify(sales));
+    // 기준 데이터는 서버(/api/sales)에 저장. 기기에는 화면을 빨리 띄우기 위한 마지막 값만 보관.
+    const normalize = (o) => { const r = {}; DAYS.forEach((d) => { r[d.id] = (o && typeof o[d.id] === "object" && o[d.id]) || {}; }); return r; };
+    let sales = normalize((() => { try { return JSON.parse(get(KEY, "{}")); } catch (e) { return {}; } })());
+    const cache = () => set(KEY, JSON.stringify(sales));
+    let pending = 0; // 서버에 보내는 중인 요청 수 (그동안은 서버 값으로 덮어쓰지 않음)
+
+    async function pull() {
+      if (pending) return;
+      try {
+        const r = await fetch("/api/sales", { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status);
+        const data = await r.json();
+        if (pending) return;
+        sales = normalize(data); cache(); render();
+      } catch (e) { toast(T[lang].offline); }
+    }
+
+    async function push(day, id, delta) {
+      pending++;
+      try {
+        const r = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ day, id, delta }),
+        });
+        if (!r.ok) throw new Error(r.status);
+        const data = await r.json();
+        pending--;
+        if (!pending) { sales = normalize(data); cache(); render(); }
+        return true;
+      } catch (e) {
+        pending--;
+        // 실패하면 화면의 숫자를 되돌림
+        const cur = sales[day][id] || 0, back = Math.max(0, cur - delta);
+        if (back) sales[day][id] = back; else delete sales[day][id];
+        cache(); render(); toast(T[lang].failed);
+        return false;
+      }
+    }
 
     let lang = get("ue18-lang", "ko") === "zh" ? "zh" : "ko";
     // 첫 화면: 오늘이 판매일이면 그 날짜, 아니면 마지막으로 보던 탭, 없으면 11/6
@@ -263,7 +283,6 @@
       const isTotal = tab === TOTAL;
       // 총합 탭 머리글: "11/6·7·8" 처럼 짧게
       document.getElementById("head-btns").textContent = isTotal ? "11/" + DAYS.map((d) => d.label.split("/")[1]).join("·") : "+ / −";
-      document.getElementById("reset").hidden = isTotal;
       rowsEl.innerHTML = WORKS.map((w) => {
         const n = viewQty(w.id);
         const [title, author] = w[lang];
@@ -293,7 +312,6 @@
       document.title = "UE18 " + T[next].title;
       document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === next)));
       document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = T[next][el.dataset.t]; });
-      document.getElementById("reset").textContent = T[next].reset;
       renderTabs(); render();
     }
 
@@ -321,42 +339,21 @@
       const b = e.target.closest("button[data-d]");
       if (!b || tab === TOTAL) return;
       const id = b.closest(".row").dataset.id;
-      const day = sales[tab];
-      const next = Math.max(0, (day[id] || 0) + Number(b.dataset.d));
+      const day = sales[tab], delta = Number(b.dataset.d);
+      const next = Math.max(0, (day[id] || 0) + delta);
+      if (next === (day[id] || 0)) return;
       if (next) day[id] = next; else delete day[id];
-      save(); render();
+      cache(); render();
       const w = WORKS.find((x) => x.id === id);
       toast(`${tabLabel(tab)} · ${w[lang][0]} ${next}${T[lang].unit}`);
+      push(tab, id, delta);
     });
-    document.getElementById("reset").addEventListener("click", () => {
-      if (tab === TOTAL) return;
-      if (!confirm(T[lang].confirmReset(tabLabel(tab)))) return;
-      sales[tab] = {}; save(); render(); toast(`${tabLabel(tab)} · ${T[lang].done}`);
-    });
-
-    // 엑셀에서 열 수 있는 CSV (날짜별 수량 + 총합). 한글 깨짐 방지용 BOM 포함
-    document.getElementById("export").addEventListener("click", () => {
-      const L = T[lang];
-      const [colWork, colAuthor] = L.work.split(" · ");
-      const head = [colWork, colAuthor, L.price, ...DAYS.map((d) => d.label), `${L.totalTab} ${L.qty}`, `${L.totalTab} ${L.amount}`];
-      const lines = [head];
-      WORKS.forEach((w) => {
-        const n = totalQtyOf(w.id);
-        lines.push([w[lang][0], w[lang][1], w.price, ...DAYS.map((d) => qtyOf(d.id, w.id)), n, n * w.price]);
-      });
-      const dayQty = DAYS.map((d) => WORKS.reduce((s, w) => s + qtyOf(d.id, w.id), 0));
-      const allQty = WORKS.reduce((s, w) => s + totalQtyOf(w.id), 0);
-      const allSum = WORKS.reduce((s, w) => s + totalQtyOf(w.id) * w.price, 0);
-      lines.push([L.sum, "", "", ...dayQty, allQty, allSum]);
-      const csv = "﻿" + lines.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      a.download = `UE18-sales-${todayId}.csv`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    });
+    // 다른 기기에서 입력한 수량도 반영되도록 주기적으로 서버 값을 다시 읽음
+    setInterval(pull, 15000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });
 
     setLang(lang);
+    pull();
   })();
   </script>
 </body>
