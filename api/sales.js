@@ -10,7 +10,7 @@
 
 const DAYS = ["2026-11-06", "2026-11-07", "2026-11-08"];
 // 작품 id (화면 순서와 무관한 고유값). 작품을 추가하면 여기도 늘려야 저장됨
-const WORK_IDS = Array.from({ length: 14 }, (_, i) => `work-${i + 1}`);
+const WORK_IDS = Array.from({ length: 15 }, (_, i) => `work-${i + 1}`);
 const key = (day) => `ue18:sales:${day}`;
 
 const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
